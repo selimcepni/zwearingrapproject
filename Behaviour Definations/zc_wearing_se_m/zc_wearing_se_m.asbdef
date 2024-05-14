@@ -1,0 +1,24 @@
+projection;
+strict ( 2 );
+
+define behavior for ZC_WEARING_SE_M //alias <alias_name>
+{
+  use create;
+  use update;
+  use delete;
+
+  use action acceptWearing;
+  use action rejectWearing;
+  use action copyWearing;
+
+  use association _Clothing { create; }
+}
+
+define behavior for ZC_CLOTHING_SE_M //alias <alias_name>
+{
+  use update;
+  use delete;
+
+  use association _Wearing;
+
+}

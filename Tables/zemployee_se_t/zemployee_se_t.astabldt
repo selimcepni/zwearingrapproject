@@ -1,0 +1,16 @@
+@EndUserText.label : 'Employee Table'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zemployee_se_t {
+
+  key client      : abap.clnt not null;
+  key employee_id : zemployeeid not null;
+  department_id   : abap.numc(6);
+  first_name      : zemployeename;
+  last_name       : abap.char(15);
+  title           : abap.char(15);
+  phone_number    : abap.numc(11);
+
+}

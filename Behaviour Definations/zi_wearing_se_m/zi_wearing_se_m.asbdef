@@ -1,0 +1,74 @@
+managed implementation in class zcl_bp_wearing_m unique; //implementation in class zbp_i_wearing_se_m unique;
+strict ( 2 );
+
+
+define behavior for ZI_WEARING_SE_M alias Wearing
+implementation in class zcl_bp_wearing_m unique
+persistent table zwearing_se_m
+with additional save
+lock master
+authorization master ( instance )
+etag master LastChangedAt
+early numbering
+{
+  field ( readonly ) WearingId, LastChangedBy, LastChangedAt, CreatedAt, CreatedBy;
+  field ( mandatory ) ClothingFee, OverallStatus, EmployeeId;
+  action ( features : instance ) acceptWearing result [1] $self;
+  action ( features : instance ) rejectWearing result [1] $self;
+  factory action copyWearing [1];
+  internal action recalcToPrice;
+  validation validateEmployee on save { create; field EmployeeId; }
+  validation validateStatus on save { create; field OverallStatus; }
+  determination calculateTotalPrice on modify { create; field ClothingFee, CurrencyCode; }
+
+  create;
+  update;
+  delete;
+  association _Clothing { create ( features : instance ); }
+  mapping for zwearing_se_m
+    {
+      WearingId     = wearing_id;
+      DepartmentId  = department_id;
+      EmployeeId    = employee_id;
+      ClothingFee   = clothing_fee;
+      TotalPrice    = total_price;
+      CurrencyCode  = currency_code;
+      Description   = description;
+      OverallStatus = overall_status;
+      CreatedBy     = created_by;
+      CreatedAt     = created_at;
+      LastChangedBy = last_changed_by;
+      LastChangedAt = last_changed_at;
+    }
+}
+
+define behavior for ZI_CLOTHING_SE_M alias Clothing
+implementation in class zcl_bp_clothing_m unique
+persistent table zclothing_se_m
+lock dependent by _Wearing
+authorization dependent by _Wearing
+etag master LastChangedAt
+early numbering
+{
+  update;
+  delete;
+  field ( mandatory ) ProductId, ProductSize, ProductCategory, Price;
+  field ( readonly ) WearingId, ClothingId, LastChangedAt;
+  field ( mandatory : create, readonly : update ) EmployeeId;
+  determination calculateTotalPrice on modify { create; field Price, CurrencyCode; }
+  association _Wearing;
+
+  mapping for zclothing_se_m
+    {
+      WearingId       = wearing_id;
+      ClothingId      = clothing_id;
+      EmployeeId      = employee_id;
+      ProductId       = product_id;
+      ProductCategory = product_category;
+      ProductSize     = product_size;
+      Price           = price;
+      CurrencyCode    = currency_code;
+      ClothingStatus  = clothing_status;
+      LastChangedAt   = last_changed_at;
+    }
+}

@@ -1,0 +1,5 @@
+@EndUserText.label: 'Approver App'
+define service ZUI_WEARING_APP_SRVD {
+  expose ZC_WEARING_APPROVER_M;
+  expose ZC_CLOTHING_APPROVER_M;
+}

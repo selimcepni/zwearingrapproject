@@ -1,0 +1,12 @@
+@EndUserText.label : 'Departmnt Table'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zdepartment_se_t {
+
+  key client        : abap.clnt not null;
+  key department_id : zdepartment_id not null;
+  department_name   : zdepartment_name;
+
+}

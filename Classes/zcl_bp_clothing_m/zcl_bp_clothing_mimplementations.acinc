@@ -1,0 +1,27 @@
+CLASS lhc_clothing DEFINITION INHERITING FROM cl_abap_behavior_handler.
+
+  PRIVATE SECTION.
+
+    METHODS calculateTotalPrice FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR Clothing~calculateTotalPrice.
+
+ENDCLASS.
+
+CLASS lhc_clothing IMPLEMENTATION.
+
+  METHOD calculateTotalPrice.
+  data: it_wearing type STANDARD TABLE OF zi_wearing_se_m WITH UNIQUE HASHED KEY KEY COMPONENTS WearingId.
+
+       it_wearing = CORRESPONDING #( keys DISCARDING DUPLICATES MAPPING WearingId = WearingId ).
+
+   MODIFY ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+    ENTITY zi_wearing_se_m
+    EXECUTE recalcToPrice
+    FROM CORRESPONDING #( it_wearing ).
+  ENDMETHOD.
+
+ENDCLASS.
+
+*"* use this source file for the definition and implementation of
+*"* local helper classes, interface definitions and type
+*"* declarations

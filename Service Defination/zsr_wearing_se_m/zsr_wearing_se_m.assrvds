@@ -1,0 +1,5 @@
+@EndUserText.label: 'Wearing service defination'
+define service ZC_WEARING_SRVD {
+  expose ZC_WEARING_SE_M;
+  expose ZC_CLOTHING_SE_M;
+}

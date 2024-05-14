@@ -1,0 +1,581 @@
+CLASS lsc_zi_wearing_se_m DEFINITION INHERITING FROM cl_abap_behavior_saver.
+
+  PROTECTED SECTION.
+
+    METHODS save_modified REDEFINITION.
+
+ENDCLASS.
+
+CLASS lsc_zi_wearing_se_m IMPLEMENTATION.
+
+  METHOD save_modified.
+
+    DATA: lt_wearing_log TYPE STANDARD TABLE OF zwear_log_se_m.
+    DATA: lt_wearing_log_c TYPE STANDARD TABLE OF zwear_log_se_m.
+    DATA: lt_wearing_log_u TYPE STANDARD TABLE OF zwear_log_se_m.
+
+    IF create-wearing IS NOT INITIAL.
+
+      lt_wearing_log = CORRESPONDING #(  create-wearing  ).
+
+
+      LOOP AT lt_wearing_log ASSIGNING FIELD-SYMBOL(<ls_wearing_log>).
+        <ls_wearing_log>-changing_operation = 'CREATE'.
+        GET TIME STAMP FIELD <ls_wearing_log>-created_at.
+        READ TABLE create-wearing ASSIGNING FIELD-SYMBOL(<ls_wearing>)
+        WITH TABLE KEY entity COMPONENTS WearingId = <ls_wearing_log>-wearingid.
+
+        IF sy-subrc IS INITIAL.
+          IF  <ls_wearing>-%control-TotalPrice = cl_abap_behv=>flag_changed.
+            <ls_wearing_log>-changed_field_name = 'Total Price'.
+            <ls_wearing_log>-changed_value = <ls_wearing>-TotalPrice.
+            TRY.
+                <ls_wearing_log>-change_id = cl_system_uuid=>create_uuid_x16_static( ).
+              CATCH cx_uuid_error.
+                "handle exception
+            ENDTRY.
+            APPEND <ls_wearing_log> TO lt_wearing_log_c.
+
+          ENDIF.
+
+          IF  <ls_wearing>-%control-OverallStatus = cl_abap_behv=>flag_changed.
+            <ls_wearing_log>-changed_field_name = 'Overall Status'.
+            <ls_wearing_log>-changed_value = <ls_wearing>-OverallStatus.
+            TRY.
+                <ls_wearing_log>-change_id = cl_system_uuid=>create_uuid_x16_static( ).
+              CATCH cx_uuid_error.
+                "handle exception
+            ENDTRY.
+            APPEND <ls_wearing_log> TO lt_wearing_log_c.
+
+          ENDIF.
+
+        ENDIF.
+
+      ENDLOOP.
+
+      INSERT zwear_log_se_m FROM TABLE @lt_wearing_log_c.
+
+
+    ENDIF.
+
+    IF update-wearing IS NOT INITIAL.
+
+           lt_wearing_log = CORRESPONDING #( update-wearing ).
+
+      LOOP AT update-wearing ASSIGNING FIELD-SYMBOL(<ls_log_update>).
+        ASSIGN lt_wearing_log[ wearingid = <ls_log_update>-WearingId ] TO FIELD-SYMBOL(<ls_log_u>).
+
+        <ls_log_u>-changing_operation = 'UPDATE'.
+        GET TIME STAMP FIELD <ls_log_u>-created_at.
+
+        IF <ls_log_update>-%control-EmployeeId = if_abap_behv=>mk-on.
+          <ls_log_u>-changed_value = <ls_log_update>-EmployeeId.
+          TRY.
+              <ls_log_u>-change_id = cl_system_uuid=>create_uuid_x16_static( ) .
+            CATCH cx_uuid_error.
+          ENDTRY.
+          <ls_log_u>-changed_field_name = 'employee_id'.
+          APPEND <ls_log_u> TO lt_wearing_log_u.
+        ENDIF.
+
+        IF <ls_log_update>-%control-description = if_abap_behv=>mk-on.
+          <ls_log_u>-changed_value = <ls_log_update>-description.
+          TRY.
+              <ls_log_u>-change_id = cl_system_uuid=>create_uuid_x16_static( ) .
+            CATCH cx_uuid_error.
+          ENDTRY.
+          <ls_log_u>-changed_field_name = 'description'.
+          APPEND <ls_log_u> TO lt_wearing_log_u.
+        ENDIF.
+      ENDLOOP.
+      INSERT zwear_log_se_m FROM TABLE @lt_wearing_log_u.
+
+
+    ENDIF.
+
+    IF delete-wearing IS NOT INITIAL.
+
+
+              lt_wearing_log = CORRESPONDING #( delete-wearing ).
+
+      LOOP AT lt_wearing_log ASSIGNING FIELD-SYMBOL(<ls_log_del>).
+        <ls_log_del>-changing_operation = 'DELETE'.
+        GET TIME STAMP FIELD <ls_log_del>-created_at.
+        TRY.
+            <ls_log_del>-change_id = cl_system_uuid=>create_uuid_x16_static( ) .
+          CATCH cx_uuid_error.
+            "handle exception
+        ENDTRY.
+      ENDLOOP.
+
+      INSERT zwear_log_se_m FROM TABLE @lt_wearing_log.
+
+
+
+    ENDIF.
+
+
+
+
+
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lhc_Wearing DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+
+    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+      IMPORTING keys
+                  REQUEST requested_authorizations
+                  FOR Wearing
+      RESULT    result.
+
+
+    METHODS copywearing FOR MODIFY
+      IMPORTING keys FOR ACTION wearing~copywearing.
+
+    METHODS recalctoprice FOR MODIFY
+      IMPORTING keys FOR ACTION wearing~recalctoprice.
+    METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING keys REQUEST requested_features FOR wearing RESULT result.
+
+    METHODS acceptwearing FOR MODIFY
+      IMPORTING keys FOR ACTION wearing~acceptwearing RESULT result.
+
+    METHODS rejectwearing FOR MODIFY
+      IMPORTING keys FOR ACTION wearing~rejectwearing RESULT result.
+
+
+    METHODS validateemployee FOR VALIDATE ON SAVE
+      IMPORTING keys FOR wearing~validateemployee.
+    METHODS validatestatus FOR VALIDATE ON SAVE
+      IMPORTING keys FOR wearing~validatestatus.
+    METHODS calculatetotalprice FOR DETERMINE ON MODIFY
+      IMPORTING keys FOR wearing~calculatetotalprice.
+
+    METHODS earlynumbering_cba_clothing
+      FOR NUMBERING
+      IMPORTING entities
+                  FOR CREATE wearing\_clothing.
+
+*
+
+    METHODS earlynumbering_create
+      FOR NUMBERING
+      IMPORTING entities
+                  FOR CREATE wearing.
+
+
+ENDCLASS.
+
+CLASS lhc_Wearing IMPLEMENTATION.
+
+  METHOD get_instance_authorizations.
+  ENDMETHOD.
+
+  METHOD earlynumbering_create.
+
+
+    DATA(lt_entities) = entities.
+
+    DELETE lt_entities WHERE WearingId IS NOT INITIAL.
+
+
+    TRY.
+        cl_numberrange_runtime=>number_get(
+                  EXPORTING
+*                ignore_buffer     =
+                    nr_range_nr       = '01'
+                    object            = '/DMO/TRV_M'
+                    quantity          = CONV #( lines( lt_entities ) )
+
+                  IMPORTING
+                    number            = DATA(lv_latest_num)
+                    returncode        = DATA(lv_code)
+                    returned_quantity = DATA(lv_qty)
+                ).
+
+      CATCH cx_nr_object_not_found.
+      CATCH cx_number_ranges INTO DATA(lo_error).
+        LOOP AT lt_entities INTO DATA(ls_entities).
+          APPEND VALUE #(  %cid = ls_entities-%cid
+                           %key = ls_entities-%key )
+            TO failed-Wearing.
+
+          APPEND VALUE #(  %cid = ls_entities-%cid
+                           %key = ls_entities-%key
+                           %msg = lo_error )
+            TO reported-Wearing.
+          EXIT.
+        ENDLOOP.
+
+
+    ENDTRY.
+
+    ASSERT lv_qty =  lines( lt_entities ).
+    DATA: lt_wearing_se_m TYPE TABLE FOR MAPPED EARLY zi_wearing_se_m,
+          ls_wearing_se_m LIKE LINE OF lt_wearing_se_m.
+
+    DATA(lv_curr_num) = lv_latest_num - lv_qty.
+
+    LOOP AT lt_entities INTO  ls_entities.
+      lv_curr_num = lv_curr_num + 1.
+      ls_wearing_se_m = VALUE #( %cid = ls_entities-%cid
+                                WearingId = lv_curr_num
+
+      ).
+      APPEND  ls_wearing_se_m TO mapped-Wearing.
+
+    ENDLOOP.
+  ENDMETHOD.
+
+
+
+
+
+  METHOD earlynumbering_cba_Clothing.
+
+    DATA : lv_max_clothing TYPE zclothing.
+
+    READ ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+    ENTITY zi_wearing_se_m BY \_Clothing
+    FROM CORRESPONDING #( entities )
+    LINK DATA(lt_link_data).
+
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<ls_group_entity>)
+                               GROUP BY <ls_group_entity>-WearingId.
+
+
+      lv_max_clothing = REDUCE #( INIT lv_max = CONV zclothing( '0' )
+                                  FOR  ls_link IN lt_link_data USING KEY entity
+                                    WHERE ( source-WearingId = <ls_group_entity>-WearingId )
+                                  NEXT lv_max = COND zclothing( WHEN lv_max < ls_link-target-ClothingId
+                                                                THEN ls_link-target-ClothingId
+                                                                ELSE lv_max ) ).
+
+
+
+      lv_max_clothing = REDUCE #( INIT lv_max = lv_max_clothing
+                                  FOR ls_entity IN entities USING KEY entity
+                                  WHERE ( WearingId =  <ls_group_entity>-WearingId )
+                                  FOR ls_clothing IN ls_entity-%target
+                                  NEXT lv_max = COND zclothing( WHEN lv_max < ls_clothing-ClothingId
+                                                                THEN ls_clothing-ClothingId
+                                                                ELSE lv_max ) ).
+
+
+      LOOP AT entities  ASSIGNING FIELD-SYMBOL(<ls_entities>)
+      USING KEY entity
+      WHERE WearingId = <ls_group_entity>-WearingId.
+
+        LOOP AT <ls_entities>-%target ASSIGNING FIELD-SYMBOL(<ls_clothing>).
+          APPEND CORRESPONDING #( <ls_clothing> ) TO mapped-clothing
+          ASSIGNING FIELD-SYMBOL(<ls_new_cloth>).
+
+          IF <ls_clothing>-ClothingId IS INITIAL.
+            lv_max_clothing += 10.
+
+            <ls_new_cloth>-ClothingId = lv_max_clothing.
+
+          ENDIF.
+        ENDLOOP.
+
+
+      ENDLOOP.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+
+  METHOD acceptWearing.
+
+    MODIFY ENTITIES OF zi_wearing_se_m ın LOCAL mode
+    ENTITY zi_wearing_se_m
+      UPDATE fields (  OverallStatus )
+      WITH VALUE #( for ls_keys in keys ( %tky = ls_keys-%tky
+                                           OverallStatus = 'A') ).
+
+
+    READ ENTITIES OF zi_wearing_se_m ın LOCAL mode
+    ENTITY zi_wearing_se_m
+    ALL FIELDS with CORRESPONDING #( keys )
+    RESULT DATA(lt_result).
+
+    result = VALUE #( FOR ls_result IN lt_result ( %tky = ls_result-%tky
+                                               %param = ls_result ) ).
+
+
+
+  ENDMETHOD.
+
+  METHOD copyWearing.
+    DATA: it_wearing      TYPE TABLE FOR CREATE zi_wearing_se_m,
+          it_clothing_cba TYPE TABLE FOR CREATE zi_wearing_se_m\_Clothing.
+
+    READ TABLE keys ASSIGNING FIELD-SYMBOL(<ls_withoutcid>) WITH KEY %cid = ' '.
+    ASSERT <ls_withoutcid> IS NOT ASSIGNED.
+
+    READ ENTITIES OF zi_wearing_se_m
+      ENTITY Wearing
+      ALL FIELDS WITH CORRESPONDING #( keys )
+      RESULT DATA(lt_wearing_r)
+      FAILED DATA(lt_wearing_f).
+
+    READ ENTITIES OF zi_wearing_se_m
+      ENTITY Wearing BY \_Clothing
+      ALL FIELDS WITH CORRESPONDING #( lt_wearing_r )
+      RESULT DATA(lt_clothing_r).
+
+
+    LOOP AT lt_wearing_r ASSIGNING FIELD-SYMBOL(<ls_wearing_r>).
+
+      APPEND VALUE #( %cid = keys[ KEY entity WearingId = <ls_wearing_r>-WearingId ]-%cid
+                         %data = CORRESPONDING #( <ls_wearing_r> EXCEPT WearingId ) ) TO it_wearing ASSIGNING FIELD-SYMBOL(<ls_wearing>).
+
+      <ls_wearing>-OverallStatus = 'O'.
+
+      APPEND VALUE #( %cid_ref = <ls_wearing>-%cid ) TO it_clothing_cba ASSIGNING FIELD-SYMBOL(<it_clothing>).
+    ENDLOOP.
+
+    LOOP AT lt_clothing_r ASSIGNING FIELD-SYMBOL(<ls_clothing_r>)
+                          USING KEY entity
+                          WHERE WearingId = <ls_wearing_r>-WearingId.
+      APPEND VALUE #( %cid = <ls_wearing>-%cid && <ls_clothing_r>-ClothingId
+                      %data = CORRESPONDING #( <ls_clothing_r> EXCEPT WearingId ) ) TO <it_clothing>-%target ASSIGNING FIELD-SYMBOL(<ls_clothing_n>).
+      <ls_clothing_n>-ClothingStatus = 'N'.
+
+    ENDLOOP.
+
+    MODIFY ENTITIES OF zi_wearing_se_m
+    ENTITY Wearing
+    CREATE FIELDS ( EmployeeId DepartmentId ClothingFee  CurrencyCode  Description  OverallStatus TotalPrice  )
+    WITH it_wearing
+    ENTITY Wearing
+    CREATE BY \_Clothing
+    FIELDS (  ClothingStatus CurrencyCode EmployeeId  ProductCategory ProductId ProductSize Price    )
+    WITH it_clothing_cba
+    MAPPED DATA(it_mapped).
+
+    mapped-wearing = it_mapped-wearing.
+
+
+  ENDMETHOD.
+
+  METHOD recalcToPrice.
+    TYPES : BEGIN OF ty_total,
+              price TYPE /dmo/total_price,
+              curr  TYPE /dmo/currency_code,
+            END OF ty_total .
+    DATA: lt_total      TYPE TABLE OF ty_total,
+          lv_conv_price TYPE ty_total-price.
+
+
+
+
+    READ ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+     ENTITY Wearing
+     FIELDS ( ClothingFee CurrencyCode )
+     WITH CORRESPONDING #( keys )
+     RESULT DATA(lt_wearing).
+
+    DELETE lt_wearing WHERE CurrencyCode IS INITIAL.
+
+    READ ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+     ENTITY Wearing BY \_Clothing
+     FIELDS ( Price CurrencyCode )
+     WITH CORRESPONDING #( lt_wearing )
+     RESULT DATA(lt_ba_clothing).
+
+
+    LOOP AT lt_wearing ASSIGNING FIELD-SYMBOL(<ls_wearing>).
+
+      lt_total =  VALUE #( ( price = <ls_wearing>-ClothingFee curr = <ls_wearing>-CurrencyCode ) ).
+
+      LOOP AT lt_ba_clothing ASSIGNING FIELD-SYMBOL(<ls_clothing>)
+                                 USING KEY entity
+                                  WHERE WearingId = <ls_wearing>-WearingId
+                                  AND CurrencyCode IS NOT INITIAL.
+
+        APPEND VALUE #( price = <ls_clothing>-Price curr = <ls_clothing>-CurrencyCode )
+           TO lt_total.
+
+      ENDLOOP.
+    ENDLOOP.
+
+    LOOP AT lt_total ASSIGNING FIELD-SYMBOL(<ls_total>).
+
+      IF <ls_total>-curr = <ls_wearing>-CurrencyCode.
+        lv_conv_price = <ls_total>-price.
+      ELSE.
+
+        /dmo/cl_flight_amdp=>convert_currency(
+          EXPORTING
+            iv_amount               = <ls_total>-price
+            iv_currency_code_source = <ls_total>-curr
+            iv_currency_code_target = <ls_wearing>-CurrencyCode
+            iv_exchange_rate_date   =  cl_abap_context_info=>get_system_date( )
+          IMPORTING
+            ev_amount               = lv_conv_price
+        ).
+
+      ENDIF.
+
+      <ls_wearing>-TotalPrice =  <ls_wearing>-TotalPrice + lv_conv_price.
+    ENDLOOP.
+
+
+
+
+    MODIFY ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+    ENTITY Wearing
+    UPDATE FIELDS ( TotalPrice )
+    WITH CORRESPONDING #( lt_wearing ).
+
+
+  ENDMETHOD.
+
+  METHOD rejectWearing.
+
+    MODIFY ENTITIES OF zi_wearing_se_m ın LOCAL mode
+     ENTITY Wearing
+       UPDATE fields (  OverallStatus )
+       WITH VALUE #( for ls_keys in keys ( %tky = ls_keys-%tky
+                                            OverallStatus = 'X') ).
+
+
+    READ ENTITIES OF zi_wearing_se_m ın LOCAL mode
+    ENTITY Wearing
+    ALL FIELDS with CORRESPONDING #( keys )
+    RESULT DATA(lt_result).
+
+    result = VALUE #( FOR ls_result IN lt_result ( %tky = ls_result-%tky
+                                               %param = ls_result ) ).
+
+  ENDMETHOD.
+
+  METHOD get_instance_features.
+
+    READ ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+    ENTITY Wearing
+    FIELDS ( OverallStatus ) WITH CORRESPONDING #( keys )
+    RESULT DATA(wearingresult)
+    FAILED failed
+    REPORTED reported.
+
+    result =
+    VALUE #(
+    FOR wear IN wearingresult
+    LET statusvalue = COND #( WHEN wear-OverallStatus = 'X'
+                              THEN if_abap_behv=>fc-o-disabled
+                              ELSE if_abap_behv=>fc-o-enabled )
+
+     IN ( %tky = wear-%tky
+         %action-rejectWearing = statusvalue
+         %action-acceptWearing = COND #( WHEN wear-OverallStatus = 'X'
+                                          THEN if_abap_behv=>fc-o-enabled
+                                          ELSE if_abap_behv=>fc-o-disabled )
+        %features-%assoc-_Clothing = COND #( WHEN wear-OverallStatus = 'X'
+                                             THEN if_abap_behv=>fc-o-disabled
+                                             ELSE if_abap_behv=>fc-o-enabled
+        ) )
+    ).
+
+
+  ENDMETHOD.
+
+
+
+  METHOD validateEmployee.
+
+    READ ENTITY IN LOCAL MODE zi_wearing_se_m
+    FIELDS ( EmployeeId )
+    WITH CORRESPONDING #( keys )
+    RESULT DATA(lt_wearing).
+
+    DATA: lt_emp TYPE SORTED TABLE OF zemployee_se_t WITH UNIQUE KEY employee_id.
+
+    lt_emp  = CORRESPONDING #( lt_wearing DISCARDING DUPLICATES MAPPING employee_id = EmployeeId  ).
+
+
+    DELETE lt_emp WHERE employee_id IS INITIAL.
+
+    SELECT
+    FROM zemployee_se_t
+    FIELDS employee_id
+    FOR ALL ENTRIES IN @lt_emp
+    WHERE employee_id =  @lt_emp-employee_id
+    INTO TABLE @DATA(lt_emp_db).
+    IF sy-subrc IS INITIAL.
+
+    ENDIF.
+
+
+    LOOP AT lt_wearing ASSIGNING FIELD-SYMBOL(<ls_wearing>).
+
+      IF  <ls_wearing>-EmployeeId IS INITIAL
+
+      OR NOT line_exists( lt_emp_db[ employee_id =  <ls_wearing>-EmployeeId  ] ) .
+
+        APPEND VALUE #( %tky = <ls_wearing>-%tky )
+                       TO failed-wearing.
+
+
+
+        APPEND VALUE #( %tky = <ls_wearing>-%tky
+                          %msg = NEW /dmo/cm_flight_messages(
+                                              textid                = /dmo/cm_flight_messages=>customer_unkown
+                                             customer_id           = <ls_wearing>-EmployeeId
+                                  severity              = if_abap_behv_message=>severity-error
+                                  )
+                          %element-EmployeeId = if_abap_behv=>mk-on
+
+          )
+                     TO reported-wearing.
+
+
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+  METHOD validateStatus.
+    READ ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+  ENTITY zi_wearing_se_m
+    FIELDS ( OverallStatus )
+    WITH CORRESPONDING #( keys )
+  RESULT DATA(lt_wearings).
+
+    LOOP AT lt_wearings INTO DATA(ls_wearing).
+      CASE ls_wearing-OverallStatus.
+        WHEN 'O'.  " Open
+        WHEN 'X'.  " Cancelled
+        WHEN 'A'.  " Accepted
+
+        WHEN OTHERS.
+          APPEND VALUE #( %tky = ls_wearing-%tky ) TO failed-wearing.
+
+          APPEND VALUE #( %tky = ls_wearing-%tky
+                          %msg = NEW /dmo/cm_flight_messages(
+                                     textid = /dmo/cm_flight_messages=>status_invalid
+                                     severity = if_abap_behv_message=>severity-error
+                                     status = ls_wearing-OverallStatus )
+                          %element-OverallStatus = if_abap_behv=>mk-on
+                        ) TO reported-wearing.
+      ENDCASE.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD calculateTotalPrice.
+    MODIFY ENTITIES OF zi_wearing_se_m IN LOCAL MODE
+      ENTITY zi_wearing_se_m
+      EXECUTE recalcToPrice
+      FROM CORRESPONDING #( keys ).
+
+  ENDMETHOD.
+
+ENDCLASS.

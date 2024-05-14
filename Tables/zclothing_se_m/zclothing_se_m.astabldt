@@ -1,0 +1,25 @@
+@EndUserText.label : 'Clothing Senario: Clothing'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table zclothing_se_m {
+
+  key client       : abap.clnt not null;
+  @AbapCatalog.foreignKey.label : 'Wearing'
+  @AbapCatalog.foreignKey.screenCheck : false
+  key wearing_id   : zwearing not null
+    with foreign key [0..*,1] zwearing_se_m
+      where wearing_id = zclothing_se_m.wearing_id;
+  key clothing_id  : zclothing not null;
+  employee_id      : zemployeeid;
+  product_id       : /dmo/supplement_id not null;
+  product_category : zproduct_category;
+  product_size     : zproduct_size;
+  @Semantics.amount.currencyCode : '/dmo/supplement.currency_code'
+  price            : /dmo/supplement_price;
+  currency_code    : /dmo/currency_code;
+  clothing_status  : /dmo/booking_status;
+  last_changed_at  : abp_locinst_lastchange_tstmpl;
+
+}
